@@ -27,7 +27,7 @@ Widget::Widget(QWidget *parent)
 
     pingButton->setFocus();
     pingButton->setShortcut(QKeySequence::InsertParagraphSeparator);
-    pingButton->setShortcut(Qt::Key_Enter);
+    pingButton->setShortcut(Qt::Key_Enter);   //按enter激活
     pingButton->setShortcut(Qt::Key_Return);
 
     ipaddrLabel = new QLabel(tr("IP Address:"));
@@ -53,16 +53,18 @@ Widget::Widget(QWidget *parent)
     //lineEdit->addValue("client.weclassroom.com");
 
 
-    //第二种方案以QCombox实现搜索框
+    //第二种方案以QCombox+QLineEdit组合实现搜索框
+    //历史记录
+    //记录提示
+    //可以对记录进行删除操作
     address_combo_box = new QComboBox();
-    address_combo_box->setEditable(true);
     address_combo_box->setFixedWidth(200);
 
-    QStringList addresses;
+    ipaddr = new QLineEdit;
+    ipaddr->setFixedWidth(180);
+
+    //建议网址
     addresses<<"www.weclassroom.com"<<"scribbleapi0001.weclassroom.com"<<"api.weclassroom.com"<<"im.weclassroom.com"<<"client.weclassroom.com";
-    /*QCompleter *m_completer = new QCompleter(addresses, this);
-    m_completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
-    address_combo_box->setCompleter(m_completer);*/
 
 
     list_widget = new QListWidget();
@@ -70,11 +72,19 @@ Widget::Widget(QWidget *parent)
     address_combo_box->setModel(list_widget->model());
     address_combo_box->setView(list_widget);
 
+    //提示补齐到QLineEdit上
+    QCompleter *completer = new QCompleter(ipaddr);
+    listModel = new QStringListModel(addresses,ipaddr);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setModel(listModel);
+    ipaddr->setCompleter(completer);
+
     for(int i=0; i<addresses.size();++i){
         addressItem *address_item = new addressItem();
         address_item->setAddressName(addresses.at(i));
         connect(address_item, SIGNAL(showAddress(QString&)), this, SLOT(showAddress_slot(QString&)));
-        connect(address_item, SIGNAL(removeAddressSig(QString&)), this, SLOT(removeAddress_slot(QString&)));
+        connect(address_item, SIGNAL(removeAddressSig(QString&)), this, SLOT(removeAddress_slot(QString&)));  //历史列表更新
+        connect(address_item, SIGNAL(removeAddressSig(QString&)), this, SLOT(deleteValue(QString&)));   //提示列表更新
         QListWidgetItem *list_item = new QListWidgetItem(list_widget);
         list_widget->setItemWidget(list_item, address_item);
     }
@@ -135,11 +145,18 @@ Widget::Widget(QWidget *parent)
     statusBox->addWidget(statusBarMid,2);
     statusBox->addWidget(statusBar,1);
 
-    QHBoxLayout *hbox1=new QHBoxLayout;
-    hbox1->addWidget(ipaddrLabel);
+    //QHBoxLayout *hbox1=new QHBoxLayout;
+    //hbox1->addWidget(ipaddrLabel);
     //hbox1->addWidget(ipaddr);
     //hbox1->addWidget(lineEdit);  //第一中方案以LineEdit实现搜索框
-    hbox1->addWidget(address_combo_box);
+    //hbox1->addWidget(address_combo_box);
+    //hbox1->addWidget(ipaddr,0,);
+
+    //hack lineEdit+Qcompleter+QCobBox实现提示+历史记录
+    QGridLayout *hbox1 = new QGridLayout;
+    hbox1->addWidget(ipaddrLabel,0,0,1,1);
+    hbox1->addWidget(address_combo_box,0,1,1,1);
+    hbox1->addWidget(ipaddr,0,1,1,1);
 
     resolvhostName = new QCheckBox(tr("Resolve IP address to hostname"),this);
 
@@ -244,9 +261,9 @@ void Widget::pingAction()
         this->ping->setResolveHostName(FALSE);
 
     tableWidget->setRowCount(0);  //连行也清除掉
-    //pingAddr = ipaddr->text();
+    pingAddr = ipaddr->text();
     //pingAddr = lineEdit->text();
-    pingAddr = address_combo_box->currentText();
+    //pingAddr = address_combo_box->currentText();
     packSize = bufferSize_spin->value();
     this->ping->setPingAddr(pingAddr);//把要ping 的地址传递给子线程
     this->ping->setPackSize(packSize);  //把发送的数据包大小传递给pinger类
@@ -365,6 +382,12 @@ Widget::~Widget()
     qDebug() <<"----------debug message finished----------";
 }
 
+void Widget::addValue(const QString &value)
+{
+    addresses.append(value);
+    listModel->setStringList(addresses);
+}
+
 void Widget::saveHist()
 {
     //首先判断是否在列表中存在这个网址
@@ -391,8 +414,17 @@ void Widget::saveHist()
             address_item->setAddressName(pingAddr);
             connect(address_item, SIGNAL(showAddress(QString&)), this, SLOT(showAddress_slot(QString&)));
             connect(address_item, SIGNAL(removeAddressSig(QString&)), this, SLOT(removeAddress_slot(QString&)));
+            connect(address_item, SIGNAL(removeAddressSig(QString&)), this, SLOT(deleteValue(QString&)));
             QListWidgetItem *list_item = new QListWidgetItem(list_widget);
             list_widget->setItemWidget(list_item, address_item);
+        }
+    }
+
+    //QCompleter列表中元素更新
+    if(QString::compare(pingAddr, QString(""))!=0){
+        bool flag = addresses.contains(pingAddr, Qt::CaseInsensitive);
+        if(!flag){
+            addValue(pingAddr);
         }
     }
 }
@@ -410,7 +442,8 @@ void Widget::updateStatusAddrInvalid()
 
 void Widget::showAddress_slot(QString &SAS)
 {
-    address_combo_box->setEditText(SAS);
+    //address_combo_box->setEditText(SAS);
+    ipaddr->setText(SAS);
     address_combo_box->hidePopup();
 }
 
@@ -430,6 +463,19 @@ void Widget::removeAddress_slot(QString &RAS)
             list_widget->takeItem(i);
             delete item;
             break;
+        }
+    }
+}
+
+void Widget::deleteValue(QString &pingAddr)
+{
+    if(QString::compare(pingAddr, QString(""))!=0){
+        bool flag = addresses.contains(pingAddr, Qt::CaseInsensitive);
+        if(flag){
+           //删除该字符串
+            addresses.removeOne(pingAddr);
+            listModel->setStringList(addresses);   //删除元素后对QCompleter列表进行更新
+            qDebug()<<"addresses delete one successfully!"<<endl;
         }
     }
 }

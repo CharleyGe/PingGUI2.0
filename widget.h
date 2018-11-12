@@ -24,7 +24,6 @@ class QTableWidget;
 class QCheckBox;
 class QSpinBox;
 class QStatusBar;
-class InnerLineEdit;
 class QComboBox;
 class QListWidget;
 
@@ -37,7 +36,7 @@ public:
     ~Widget();
 
 signals:
-    void searchTextChanged(QString);
+    //void searchTextChanged(QString);
 
 private:
     QGroupBox *hostBox;
@@ -69,6 +68,8 @@ private:
     //第二种方案以combox实现搜索框便于删除历史记录带有Qcompleter补全机制
     QComboBox *address_combo_box;
     QListWidget *list_widget;
+    QStringList addresses;  //QCompleter和QcomboBox下拉菜单中元素列表
+    QStringListModel *listModel;  //QCompleter使用
 
 private slots:
     void pingAction();  //开始ping
@@ -94,6 +95,8 @@ private slots:
     void showAddress_slot(QString &SAS);
     void removeAddress_slot(QString &RAS);
     void saveHist();  //记录历史
+    void addValue(const QString &value);  //往Qcompleterlist中添加新的条目
+    void deleteValue(QString &value);
 };
 
 #endif // WIDGET_H

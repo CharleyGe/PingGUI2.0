@@ -18,13 +18,11 @@ SOURCES += main.cpp\
         widget.cpp \
     pinger.cpp \
     showinformaionmessagebox.cpp \
-    innerlineedit.cpp \
     addressitem.cpp
 
 HEADERS  += widget.h \
     pinger.h \
     showinformationmessagebox.h \
-    innerlineedit.h \
     addressitem.h
 
 RESOURCES += \
