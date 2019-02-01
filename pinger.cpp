@@ -208,6 +208,8 @@ void Pinger::ping()
             statistic++;
         Sleep(1000);
     }
+
+    closesocket(sockRaw);
         //destip,Sendt,Received,Lost-->desr_ip/times/statistic/times-statistic/(float)(times-statistic)/times*100
 
         qDebug()<<endl<<"Ping statistics for "<<dest_ip<<endl;
