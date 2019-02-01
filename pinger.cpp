@@ -11,7 +11,7 @@ Pinger::Pinger():
     //版本设置
     if(WSAStartup(MAKEWORD(2,1), &wsaData)!=0){
         qDebug()<<"WSAStartup failed"<<endl;
-        ExitProcess(STATUS_FAILED);
+        return;
     }
 }
 
@@ -48,30 +48,31 @@ void Pinger::ping()
     char *dest_ip;
     unsigned int addr=0;
     USHORT seq_no=0;
+
+    /*IP pattern expression (zhengze)*/
     QString pattern("^(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d|[1-9]\\."
                     "(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d|\\d)\\."
                     "(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d|\\d)\\."
                     "(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d|\\d)$");
     QRegExp rx(pattern);
 
+    //attention:to create sockRaw with admin right
     sockRaw = WSASocket(AF_INET, SOCK_RAW, IPPROTO_ICMP, NULL, 0, WSA_FLAG_OVERLAPPED);
 
     if(sockRaw==INVALID_SOCKET){
         qDebug()<<"WSASocket() failed"<<endl;
-        ExitProcess(STATUS_FAILED);
+        return;
     }
 
     bread=setsockopt(sockRaw, SOL_SOCKET, SO_RCVTIMEO,(char*)&timeout, sizeof(timeout));
     if(bread==SOCKET_ERROR){
         qDebug()<<"Failed to set recv timeout"<<endl;
-        //ExitProcess(STATUS_FAILED);
         return;
     }
     timeout=timeOut;
     bread=setsockopt(sockRaw, SOL_SOCKET, SO_SNDTIMEO,(char*)&timeout, sizeof(timeout));
     if(bread==SOCKET_ERROR){
         qDebug()<<"failed to set send timeout"<<endl;
-        //ExitProcess(STATUS_FAILED);
         return;
     }
     bread=setsockopt(sockRaw, IPPROTO_IP, IP_TTL, (char*)&TTL, sizeof(TTL));
@@ -88,6 +89,7 @@ void Pinger::ping()
     hp = gethostbyname(charAddr);
 
     if(!hp){
+        /*To ensure the IP Address is valid*/
        // qDebug()<<"IP Address"<<endl;
         bool match = rx.exactMatch(pingAddr);  //判断IP值是否合法
         if(!match)  //合法
@@ -138,7 +140,7 @@ void Pinger::ping()
 
     if(!icmp_data){
         qDebug()<<"malloc failed"<<endl;
-        ExitProcess(STATUS_FAILED);
+        return;
     }
 
     memset(icmp_data, 0, datasize);
@@ -204,15 +206,21 @@ void Pinger::ping()
         }
         if(!decode_resp(recvbuf,bread,&from))
             statistic++;
-        Sleep(200);
+        Sleep(1000);
     }
         //destip,Sendt,Received,Lost-->desr_ip/times/statistic/times-statistic/(float)(times-statistic)/times*100
 
         qDebug()<<endl<<"Ping statistics for "<<dest_ip<<endl;
         qDebug()<<"Packet: Sent = "<<times<<" Received = "<<statistic<<" Lost = "<<times-statistic<<"("<<(times-statistic)*100/times<<"% loss)"<<endl;
-        qDebug()<<QString("Minimum = %1ms, Maximum = %2ms, Average=%3ms").arg(Minimum).arg(Maximum).arg((Maximum+Minimum)/2)<<endl;
+        qDebug()<<QString("Minimum = %1ms, Maximum = %2ms, Average=%3ms").arg(Minimum).arg(Maximum).arg(Sum/statistic)<<endl;
         emit sendResultData(count,statistic);  //发送统计信息
         //return statistic;
+        if(NULL != icmp_data)
+        {
+            free(icmp_data);
+            icmp_data = NULL;
+        }
+        return;
 }
 
 int Pinger::decode_resp(char *buf,int bytes,struct sockaddr_in *from){
@@ -344,6 +352,7 @@ void Pinger::transferData()
             Minimum = Maximum = pPingReply->m_dwRoundTripTime;
             timeFlag = false;
         }
+        Sum+=pPingReply->m_dwRoundTripTime;
         if(pPingReply->m_dwRoundTripTime<Minimum)
             Minimum = pPingReply->m_dwRoundTripTime;
         if(pPingReply->m_dwRoundTripTime>Maximum)

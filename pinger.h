@@ -115,7 +115,7 @@ private:
     int Times;
     int count=0, statistic=0;
     bool emitFlag=false;  //是否ping通过可以发送结果信息
-    int Minimum=0, Maximum=0, Average=0;
+    int Minimum=0, Maximum=0, Average=0, Sum=0;
     bool timeFlag=true;
 public slots:
     void stopImmediately();
